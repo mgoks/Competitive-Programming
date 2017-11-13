@@ -1,132 +1,206 @@
-/* IN PROGRESS */
-
-package coast;
-
-import java.util.Arrays;
-import java.util.Scanner;
-
 /**
- * @author Halil Murat
  * Kattis - Get Shorty
+ * open.kattis.com/problems/getshorty
+ * If you would like run this program on your computer, please change file name to Graph.java.
  */
 
+import java.io.BufferedOutputStream;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.io.PrintWriter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.StringTokenizer;
+
 /**
- * Represents a corridor in the maze
+ * Represents a corridor
  * @author Halil Murat
  */
 class Edge
 {
-	int aV;			// neighbouring vertex
-	float aFactor; 	// weapon factor on this edge
+	final int v;
+	final float weight;
 	
-	Edge(int pV, float pFactor)
+	Edge(int pV, float pWeight)
 	{
-		aV = pV;
-		aFactor = pFactor;
-	}
-	
-	@Override
-	public String toString()
-	{
-		return "--" + aFactor + "--> " + aV;
+		v 	= pV;
+		weight 	= pWeight;
 	}
 }
 
 /**
- * Represents the maze
+ * Represents a dungeon
  * @author Halil Murat
  */
-class Graph
+public class Graph 
 {
-	static final int MAXV 	   = 10000;	// maximum number of vertices
-	static final int MAXDEGREE = 9999;	// maximum vertex outdegree - TODO: necessary?
+	List<List<Edge>> edges;
+	int[] degree;
+	int nVertices;
+	int nEdges;
+	final int maxDegree;
 	
-	Edge[][] aEdges;					// adjacency info
-	int[] aDegree;						// outdegree of each vertex - TODO: necessary?
-	int aV;								// number of vertices in graph
-	int aE;								// number of edges in graph
-	
-	/**
-	 * Creates an empty graph and initializes it
-	 * @param pEdges	adjacency info
-	 * @param pDegree	utdegree of each vertex - TODO: necessary?
-	 * @param pV		number of vertices in graph
-	 * @param pE		number of edges in graph
-	 */
-	Graph(Edge[][] pEdges, int[] pDegree, int pV, int pE)
+	Graph(int pNVertices, int pNEdges)
 	{
-		aEdges = pEdges;
-		aDegree = pDegree;
-		Arrays.fill(aDegree, 0); 	// TODO: necessary?
-		aV = pV;
-		aE = pE;
+		edges 		= new ArrayList<List<Edge>>(pNVertices);
+		for (int i = 0; i < pNVertices; i++)
+			edges.add(new ArrayList<Edge>());
+		degree 		= new int[pNVertices];
+		nVertices 	= pNVertices;
+		nEdges 		= pNEdges;
+		maxDegree 	= pNVertices - 1;
 	}
 	
-	/**
-	 * TODO: update factor
-	 * @param x
-	 * @param y
-	 * @param directed	a Boolean flag directed to identify whether we need to insert two copies of each edge or only one
-	 */
-	void insertEdge( int x, int y, float f, boolean directed )
+	Edge insertEdge( int x, int y, float f, boolean directed, Kattio io )
 	{
-		if (this.aDegree[x] > MAXDEGREE)
-			System.out.println("Warning: insertion("+x+","+y+" exceeds max degree");
+		Edge e;
 		
-		this.aEdges[x][this.aDegree[x]] = new Edge(y, f);
-		this.aDegree[x]++;
+		e = new Edge(y, f);
+		edges.get(x).add(e);
+		degree[x]++;
 		
 		if (directed == false)
-			this.insertEdge(y, x, f, true);
+			insertEdge(y,x,f,true,io);
 		else
-			this.aE++;
+			nEdges++;
+		return e;
 	}
-	
-	void print()
-	{
-		int i, j;
-		for (i = 0; i < this.aV; i++){
-			System.out.println(i + ":");
-			for( j = 0; j < this.aDegree[i]; j++ )
-				System.out.println(" " + this.aEdges[i][j]);
-			System.out.println();
-		}
-	}
-}
 
-
-public class GetShorty_260572202 
-{
 	/**
-	 * Creates a graph and fills it with the values it read from the input
-	 * @param directed	a boolean value indicating whether the graph is directed or not
-	 * @return			a complete graph as described in the input
+	 * Slightly modified version of Dijkstra's Algorithm to find Mikael's 
+	 * minimum-possible fraction at the exit (intersection n-1)
+	 * @param start		start vertex (vertex #0)
+	 * @return		Mikael's fraction at intersection #(n-1)
 	 */
-	public static Graph readGraphFromInput(boolean directed)
+	float dijkstra(int start)
 	{
-		int n; 		// number of vertices
-		int m;		// number of edges
-		int x, y;	// vertices in edge (x,y)
-		float f;	// 
-		Scanner s = new Scanner(System.in);
-		n = s.nextInt();
-		m = s.nextInt();
-		Edge[][] edges = new Edge[n][n-1];	// adjacency info
-		int[] degree  = new int[n];
-		Graph g = new Graph(edges, degree, n, m);
-		for( int i = 1; i <= m; i++ ){
-			x = s.nextInt();
-			y = s.nextInt();
-			f = s.nextFloat();
-			g.insertEdge(x, y, f, directed);
+		int i;
+		boolean[] inTree = new boolean[this.nVertices];
+		float[] fraction = new float[nVertices];
+		int v, w;
+		float factor, frac;
+		int[] parent = new int[nVertices];
+		
+		for (i = 0; i < nVertices; i++)
+		{
+			fraction[i] = 0.0f;
+			parent[i] = -1;
 		}
-		s.close();
-		return g;
+		fraction[start] = 1.0f;
+		v = start;
+		while (inTree[v] == false)
+		{
+			inTree[v] = true;
+			for (i = 0; i < degree[v]; i++)
+			{
+				w = edges.get(v).get(i).v;
+				factor = edges.get(v).get(i).weight;
+				if (fraction[w] < fraction[v] * factor)
+				{
+					fraction[w] = fraction[v] * factor;
+					parent[w] = v;
+				}
+			}
+			v = 0;
+			frac = 0.0f;
+			for (i = 1; i < nVertices; i++)
+			{
+				if (inTree[i] == false && frac < fraction[i])
+				{
+					frac = fraction[i];
+					v = i;
+				}
+			}
+		}
+		return fraction[nVertices-1];
 	}
 	
 	public static void main(String[] args) 
 	{
-		Graph g = readGraphFromInput(false);
-		g.print();
+		int n,m,u,v;
+		float f;
+		int i;
+		Kattio io;
+		
+		io = new Kattio(System.in, System.out);
+		while(true)
+		{
+			n = io.getInt();
+			m = io.getInt();
+			if( n == 0 && m == 0 )
+				break;
+			
+			Graph g = new Graph(n, m);	// initialize graph
+			for (i = 0; i < m; i++)
+			{
+				u = io.getInt();
+				v = io.getInt();
+				f = (float) io.getDouble();
+				g.insertEdge(u, v, f, false, io);
+			}
+			io.println(String.format("%.4f", g.dijkstra(0)));
+		}
+		io.close();
 	}
+}
+
+/** Simple yet moderately fast I/O routines.
+ * @author: Kattis
+ */
+class Kattio extends PrintWriter {
+   public Kattio(InputStream i) {
+       super(new BufferedOutputStream(System.out));
+       r = new BufferedReader(new InputStreamReader(i));
+   }
+   public Kattio(InputStream i, OutputStream o) {
+       super(new BufferedOutputStream(o));
+       r = new BufferedReader(new InputStreamReader(i));
+   }
+
+   public boolean hasMoreTokens() {
+       return peekToken() != null;
+   }
+
+   public int getInt() {
+       return Integer.parseInt(nextToken());
+   }
+
+   public double getDouble() {
+       return Double.parseDouble(nextToken());
+   }
+
+   public long getLong() {
+       return Long.parseLong(nextToken());
+   }
+
+   public String getWord() {
+       return nextToken();
+   }
+
+   private BufferedReader r;
+   private String line;
+   private StringTokenizer st;
+   private String token;
+
+   private String peekToken() {
+       if (token == null)
+           try {
+               while (st == null || !st.hasMoreTokens()) {
+                   line = r.readLine();
+                   if (line == null) return null;
+                   st = new StringTokenizer(line);
+               }
+               token = st.nextToken();
+           } catch (IOException e) { }
+       return token;
+   }
+
+   private String nextToken() {
+       String ans = peekToken();
+       token = null;
+       return ans;
+   }
 }
